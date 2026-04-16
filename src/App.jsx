@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useMemo, memo } from "react";
-import "./index.css";
 
-/* ── Constants ─────────────────────────────────────────────── */
+/* ── Constants ──────────────────────────────────────────── */
 const PLATFORMS = [
   { id:"zepto",           name:"Zepto",            emoji:"⚡", color:"#a855f7", bg:"rgba(168,85,247,0.11)", border:"rgba(168,85,247,0.38)" },
   { id:"blinkit",         name:"Blinkit",          emoji:"🟡", color:"#eab308", bg:"rgba(234,179,8,0.11)",  border:"rgba(234,179,8,0.38)"  },
@@ -15,16 +14,16 @@ const PLATFORMS = [
 const PLATFORM_MAP = new Map(PLATFORMS.map(p => [p.id, p]));
 
 const SUGGESTIONS = [
-  "Amul Milk 500ml", "Eggs 12 pack", "Maggi Noodles", "Parle-G",
-  "Dettol Soap", "Coke 750ml", "Bread Loaf", "Haldiram Bhujia",
-  "Colgate Toothpaste", "Paracetamol 500mg",
+  "Amul Milk 500ml","Eggs 12 pack","Maggi Noodles","Parle-G",
+  "Dettol Soap","Coke 750ml","Bread Loaf","Haldiram Bhujia",
+  "Colgate Toothpaste","Paracetamol 500mg",
 ];
 
 const STATUS_META = {
-  available:   { label: "In Stock",     dot: "#22c55e", text: "#4ade80" },
-  unavailable: { label: "Out of Stock", dot: "#ef4444", text: "#f87171" },
-  unknown:     { label: "Not Found",    dot: "#4b5563", text: "#9ca3af" },
-  loading:     { label: "Checking…",   dot: "#f59e0b", text: "#fbbf24" },
+  available:   { label:"In Stock",     dot:"#22c55e", text:"#4ade80" },
+  unavailable: { label:"Out of Stock", dot:"#ef4444", text:"#f87171" },
+  unknown:     { label:"Not Found",    dot:"#4b5563", text:"#9ca3af" },
+  loading:     { label:"Checking…",   dot:"#f59e0b", text:"#fbbf24" },
 };
 
 const SYSTEM_PROMPT = `You are a product availability checker for quick-commerce platforms in Bangalore, India.
@@ -38,13 +37,11 @@ Given a product name, use web_search to check availability on these 7 platforms 
 6. Amazon Now / Amazon Fresh (amazon.in)
 7. Flipkart Minutes (flipkart.com/minutes)
 
-For each platform search: "[product] [platform] Bangalore" and "[product] price [platform]".
-
 Respond ONLY with valid JSON, no markdown, no preamble:
 {
   "summary": "1-2 sentence plain summary",
   "platforms": [
-    { "id":"zepto",           "status":"available|unavailable|unknown", "price":"₹XX or null", "note":"≤10 words", "url":"string or null" },
+    { "id":"zepto",           "status":"available|unavailable|unknown", "price":"₹XX or null", "note":"10 words max", "url":"string or null" },
     { "id":"blinkit",         "status":"...", "price":null, "note":"...", "url":null },
     { "id":"instamart",       "status":"...", "price":null, "note":"...", "url":null },
     { "id":"bigbasket",       "status":"...", "price":null, "note":"...", "url":null },
@@ -55,31 +52,34 @@ Respond ONLY with valid JSON, no markdown, no preamble:
 }
 Rules: "available"=listed+in stock, "unavailable"=found but OOS, "unknown"=no data. Never fabricate prices.`;
 
-/* ── Session storage helpers ─────────────────────────────── */
 const HISTORY_KEY = "qc_recent";
-const getHistory  = () => { try { return JSON.parse(sessionStorage.getItem(HISTORY_KEY) || "[]"); } catch { return []; } };
+const getHistory  = () => {
+  try { return JSON.parse(sessionStorage.getItem(HISTORY_KEY) || "[]"); }
+  catch { return []; }
+};
 const pushHistory = (q) => {
-  const prev = getHistory().filter(x => x.toLowerCase() !== q.toLowerCase());
-  sessionStorage.setItem(HISTORY_KEY, JSON.stringify([q, ...prev].slice(0, 6)));
+  try {
+    const prev = getHistory().filter(x => x.toLowerCase() !== q.toLowerCase());
+    sessionStorage.setItem(HISTORY_KEY, JSON.stringify([q, ...prev].slice(0, 6)));
+  } catch { /* ignore */ }
 };
 
-/* ── parsePrice helper ───────────────────────────────────── */
-const parseNumericPrice = (str) => {
+const parsePrice = (str) => {
   if (!str) return null;
   const n = parseFloat(str.replace(/[^\d.]/g, ""));
   return isNaN(n) ? null : n;
 };
 
-/* ── SkeletonCard (memoised) ─────────────────────────────── */
+/* ── SkeletonCard ───────────────────────────────────────── */
 const SkeletonCard = memo(() => (
   <div className="skeleton-card">
-    <div className="skel-line" style={{ height: 14, width: "60%", animationDelay: "0s" }} />
-    <div className="skel-line" style={{ height: 11, width: "40%", animationDelay: "0.12s" }} />
-    <div className="skel-line" style={{ height: 11, width: "70%", animationDelay: "0.24s" }} />
+    <div className="skel-line" style={{ height:14, width:"60%", animationDelay:"0s" }} />
+    <div className="skel-line" style={{ height:11, width:"40%", animationDelay:"0.12s" }} />
+    <div className="skel-line" style={{ height:11, width:"70%", animationDelay:"0.24s" }} />
   </div>
 ));
 
-/* ── PlatformCard (memoised) ─────────────────────────────── */
+/* ── PlatformCard ───────────────────────────────────────── */
 const PlatformCard = memo(({ platform, result, isBest, idx }) => {
   const sm          = STATUS_META[result?.status || "loading"];
   const isAvailable = result?.status === "available";
@@ -88,8 +88,8 @@ const PlatformCard = memo(({ platform, result, isBest, idx }) => {
     <div
       className={`platform-card${isAvailable ? " available" : ""}`}
       style={{
-        "--card-bg":     platform.bg,
-        "--card-border": platform.border,
+        "--card-bg":     isAvailable ? platform.bg     : "rgba(255,255,255,0.02)",
+        "--card-border": isAvailable ? platform.border : "rgba(255,255,255,0.07)",
         animationDelay:  `${idx * 0.055}s`,
       }}
     >
@@ -122,7 +122,21 @@ const PlatformCard = memo(({ platform, result, isBest, idx }) => {
   );
 });
 
-/* ── Main App ────────────────────────────────────────────── */
+/* ── BestPriceBanner ────────────────────────────────────── */
+const BestPriceBanner = memo(({ best }) => {
+  if (!best) return null;
+  const p = PLATFORM_MAP.get(best.id);
+  return (
+    <div className="best-price-banner">
+      <span>🏷️</span>
+      <span className="best-price-label">Best price</span>
+      <span className="best-price-val">{best.price}</span>
+      <span className="best-price-on">on {p?.name}</span>
+    </div>
+  );
+});
+
+/* ── App ────────────────────────────────────────────────── */
 export default function App() {
   const [query,       setQuery]       = useState("");
   const [results,     setResults]     = useState(null);
@@ -133,11 +147,10 @@ export default function App() {
   const [history,     setHistory]     = useState(getHistory);
   const [lastQuery,   setLastQuery]   = useState("");
 
-  const inputRef   = useRef();
-  const abortRef   = useRef(null);
-  const resultsRef = useRef();
+  const inputRef  = useRef();
+  const abortRef  = useRef(null);
+  const resultRef = useRef();
 
-  /* Derived — useMemo for perf */
   const platformResults = useMemo(() => {
     if (!results?.platforms) return new Map();
     return new Map(results.platforms.map(r => [r.id, r]));
@@ -148,7 +161,7 @@ export default function App() {
     let best = null, bestPrice = Infinity;
     for (const r of results.platforms) {
       if (r.status !== "available") continue;
-      const n = parseNumericPrice(r.price);
+      const n = parsePrice(r.price);
       if (n !== null && n < bestPrice) { bestPrice = n; best = r; }
     }
     return best;
@@ -164,26 +177,28 @@ export default function App() {
     results?.platforms?.filter(r => r.status === "available").length ?? 0
   ), [results]);
 
-  /* Search */
   const doSearch = useCallback(async (overrideQ) => {
     const trimmed = (overrideQ ?? query).trim();
     if (!trimmed || loading) return;
 
-    // Cancel any in-flight request
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
-    // Haptic feedback on mobile
-    if (navigator.vibrate) navigator.vibrate(10);
-
+    if (navigator?.vibrate) navigator.vibrate(10);
     inputRef.current?.blur();
+
     setLoading(true);
     setError(null);
     setFilterStock(false);
     setLastQuery(trimmed);
-    setResults({ summary: null, platforms: PLATFORMS.map(p => ({ id: p.id, status: "loading" })) });
+    setResults({
+      summary: null,
+      platforms: PLATFORMS.map(p => ({ id: p.id, status: "loading" })),
+    });
 
-    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    setTimeout(() => {
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
 
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -205,8 +220,8 @@ export default function App() {
       const textBlock = data.content?.filter(b => b.type === "text").pop();
       if (!textBlock) throw new Error("No response received.");
 
-      let raw   = textBlock.text.trim().replace(/```json|```/gi, "").trim();
-      const m   = raw.match(/\{[\s\S]*\}/);
+      let raw  = textBlock.text.trim().replace(/```json|```/gi, "").trim();
+      const m  = raw.match(/\{[\s\S]*\}/);
       const parsed = JSON.parse(m ? m[0] : raw);
 
       setResults(parsed);
@@ -214,7 +229,7 @@ export default function App() {
       setHistory(getHistory());
     } catch (e) {
       if (e.name === "AbortError") return;
-      setError(e.message || "Something went wrong. Please try again.");
+      setError(e.message || "Something went wrong. Try again.");
       setResults(null);
     } finally {
       setLoading(false);
@@ -232,14 +247,13 @@ export default function App() {
   }, []);
 
   const clearHistory = useCallback(() => {
-    sessionStorage.removeItem(HISTORY_KEY);
+    try { sessionStorage.removeItem(HISTORY_KEY); } catch { /* ignore */ }
     setHistory([]);
   }, []);
 
-  const isLoading = loading;
-
   return (
     <div className="app">
+      {/* Ambient glows */}
       <div className="glow-wrap">
         <div className="glow-1" />
         <div className="glow-2" />
@@ -247,7 +261,7 @@ export default function App() {
 
       <div className="content">
 
-        {/* ── Header ── */}
+        {/* Header */}
         <header className="header">
           <div className="location-badge">
             <span className="location-dot" />
@@ -264,7 +278,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* ── Recent searches ── */}
+        {/* Recent searches */}
         {history.length > 0 && !results && !loading && (
           <div className="recent-wrap">
             <div className="recent-header">
@@ -282,7 +296,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ── Suggestions ── */}
+        {/* Suggestions */}
         {!results && !loading && (
           <div className="suggestions-wrap">
             <p className="suggestions-label">POPULAR SEARCHES</p>
@@ -297,7 +311,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ── Error ── */}
+        {/* Error */}
         {error && (
           <div className="error-box">
             <div className="error-text">⚠️ {error}</div>
@@ -305,9 +319,9 @@ export default function App() {
           </div>
         )}
 
-        {/* ── Results toolbar ── */}
+        {/* Results toolbar */}
         {results && (
-          <div ref={resultsRef} className="toolbar">
+          <div ref={resultRef} className="toolbar">
             <div className="result-meta">
               <span className="result-count">{inStock}/{PLATFORMS.length} in stock</span>
               {lastQuery && <span className="result-query">"{lastQuery}"</span>}
@@ -321,7 +335,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ── Summary ── */}
+        {/* Summary */}
         {results?.summary && !loading && (
           <div className="summary-bar">
             <span className="summary-dot">●</span>
@@ -329,38 +343,31 @@ export default function App() {
           </div>
         )}
 
-        {/* ── Best price banner ── */}
-        {bestPlatform && !loading && (() => {
-          const p = PLATFORM_MAP.get(bestPlatform.id);
-          return (
-            <div className="best-price-banner">
-              <span>🏷️</span>
-              <span className="best-price-label">Best price</span>
-              <span className="best-price-val">{bestPlatform.price}</span>
-              <span className="best-price-on">on {p?.name}</span>
-            </div>
-          );
-        })()}
+        {/* Best price banner */}
+        {!loading && <BestPriceBanner best={bestPlatform} />}
 
-        {/* ── Cards ── */}
-        {(results || isLoading) && (
+        {/* Cards grid */}
+        {(results || loading) && (
           <div className="cards-grid">
-            {(isLoading ? PLATFORMS : visiblePlatforms).map((p, i) => {
+            {(loading ? PLATFORMS : visiblePlatforms).map((p, i) => {
               const res = platformResults.get(p.id);
-              return isLoading && res?.status === "loading"
-                ? <SkeletonCard key={p.id} />
-                : <PlatformCard
-                    key={p.id}
-                    platform={p}
-                    result={res}
-                    isBest={bestPlatform?.id === p.id}
-                    idx={i}
-                  />;
+              if (loading && res?.status === "loading") {
+                return <SkeletonCard key={p.id} />;
+              }
+              return (
+                <PlatformCard
+                  key={p.id}
+                  platform={p}
+                  result={res}
+                  isBest={bestPlatform?.id === p.id}
+                  idx={i}
+                />
+              );
             })}
           </div>
         )}
 
-        {/* ── Disclaimer ── */}
+        {/* Disclaimer */}
         {results && !loading && (
           <p className="disclaimer">
             ⚡ AI-powered via web search — not live inventory.<br />
@@ -370,7 +377,7 @@ export default function App() {
 
       </div>
 
-      {/* ── Bottom search dock ── */}
+      {/* Bottom search dock */}
       <div className="search-dock">
         <div className="search-inner">
           <div className={`search-field${focused ? " focused" : ""}`}>
@@ -390,9 +397,9 @@ export default function App() {
               onKeyDown={e => e.key === "Enter" && doSearch()}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              disabled={isLoading}
+              disabled={loading}
             />
-            {query && !isLoading && (
+            {query && !loading && (
               <button className="clear-btn" onClick={clear}>✕</button>
             )}
           </div>
@@ -400,9 +407,9 @@ export default function App() {
           <button
             className="go-btn"
             onClick={() => doSearch()}
-            disabled={isLoading || !query.trim()}
+            disabled={loading || !query.trim()}
           >
-            {isLoading ? <span className="spinner" /> : "Go"}
+            {loading ? <span className="spinner" /> : "Go"}
           </button>
         </div>
       </div>

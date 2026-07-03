@@ -9,7 +9,7 @@ export default function ProductDetail({ product, onClose }) {
   const best = offers[0];
   const worst = offers[offers.length - 1];
   const saving = worst.price - best.price;
-  const missing = PLATFORM_IDS.filter(id => !(id in product.prices));
+  const missing = PLATFORM_IDS.filter(id => product.prices[id] == null);
 
   useEffect(() => {
     const onKey = e => e.key === "Escape" && onClose();

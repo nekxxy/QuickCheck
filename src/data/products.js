@@ -154,6 +154,7 @@ export const PRODUCTS = [
 // ── Derived helpers ──────────────────────────────────────────
 export function sortedOffers(product) {
   return Object.entries(product.prices)
+    .filter(([, price]) => price != null)
     .map(([id, price]) => ({ id, price, ...PLATFORMS[id] }))
     .sort((a, b) => a.price - b.price);
 }
